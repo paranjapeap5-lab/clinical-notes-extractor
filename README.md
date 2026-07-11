@@ -2,6 +2,8 @@
 
 Extracts structured patient information from unstructured clinical notes using an LLM (Claude), with schema validation and error handling so the output can be trusted rather than assumed correct.
 
+> ⚠️ **Work in progress.** Demographics extraction is implemented and working; the remaining categories (symptoms, comorbidities, medications, blood tests) and the evaluation are actively being built. See the [Roadmap](#roadmap).
+
 ## Goal
 
 Clinical notes are written as free text — abbreviations, narrative prose, values buried in sentences, fields simply omitted. This project turns that unstructured text into **structured, validated data** that downstream systems can actually use.
@@ -156,6 +158,9 @@ Designed for the [`AGBonnet/augmented-clinical-notes`](https://huggingface.co/da
 **Do not use real, identifiable patient data with this tool.** It is for research and de-identified public data only.
 
 ## Roadmap
+
+🚧 *In progress — items are checked off as they land.*
+
 
 - [ ] Additional fields: symptoms (with negation handling), comorbidities, medications, blood tests
 - [ ] Span grounding to catch hallucinated findings
