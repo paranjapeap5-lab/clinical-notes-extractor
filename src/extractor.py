@@ -112,11 +112,16 @@ def extract_symptoms(note: str, client) -> dict:
         }
 
 
-BLOOD_PROMPT_TEMPLATE = """Extract patient blood test information from the
+LAB_TEST_PROMPT_TEMPLATE = """Extract patient laboratory test information from the
 clinical note below.
 
-Return ONLY a JSON array (a list) of blood test objects. Each object must have:
-- "test_name": the name of the blood test, for example "WBC" or "CRP".
+Return ONLY a JSON array (a list) of lab test objects. Each object must have:
+- "test_name": the name of the lab test, for example "WBC" or "CRP".
+Include culture tests, PCR tests, and other lab tests,
+but not imaging or other procedures.
+- "sample_type": the specimen the test is run on
+(e.g. blood, urine, synovial fluid, nasopharyngeal swab).
+Infer from the test name where possible; use null if genuinely unclear.
 - "result_type": indicating if the test result is qualitative or quantitative.
 If it is a test which should have a measurable value but only has a categorical result
 (for example a "CRP" test with a low or elevated result),
@@ -127,7 +132,10 @@ and the value with the units if quantitative.
 It may also be low/elevated for a measurable test.
 Null if no value is present.
 
-If there are no blood tests, return an empty list: []
+Only extract specifically named tests with a result. Don't include vague summaries
+such as "labs were normal", "blood biochemistry normal", or
+"complete blood tests normal" as tests.
+If there are no lab tests, return an empty list: []
 
 Return nothing but the JSON array — no explanation, no markdown fences.
 
@@ -138,7 +146,7 @@ Clinical note:
 
 def extract_blood_tests(note: str, client) -> dict:
     """Extract a list of blood tests. Returns a structured result dict."""
-    prompt = BLOOD_PROMPT_TEMPLATE.format(note=note)
+    prompt = LAB_TEST_PROMPT_TEMPLATE.format(note=note)
     raw_response = client.complete(prompt)
 
     # clean markdown fences

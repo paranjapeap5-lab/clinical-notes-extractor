@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import anthropic
-import config
+from src import config
 
 load_dotenv()
 
