@@ -165,11 +165,10 @@ Designed for the [`AGBonnet/augmented-clinical-notes`](https://huggingface.co/da
 - [X] Additional fields: symptoms (with negation handling),
 - [ ] Additional fields: comorbidities
 - [ ] Additional fields: medications
-- [ ] Additional fields: blood tests
-- [ ] Span grounding to catch hallucinated findings
+- [X] Additional fields: laboratory tests
 - [ ] Evaluation against hand-labeled ground truth (precision / recall per field)
 - [ ] Robust batch processing (checkpointing, resume) for the full dataset
-- [ ] Model comparison across cost / quality / latency
+- [ ] Create Streamlit demo
 
 ## Limitations
 
