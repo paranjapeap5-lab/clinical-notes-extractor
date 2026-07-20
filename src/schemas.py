@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+from typing import Literal
 
 
 class Demographics(BaseModel):
@@ -43,3 +44,12 @@ class Symptom(BaseModel):
     severity: Optional[str] = Field(
         default=None, description="mild | moderate | severe, if stated. null otherwise."
     )
+
+
+class LabTest(BaseModel):
+    test_name: str = Field(description="___")
+    sample_type: Optional[str] = Field(default=None, description="___")
+    result_type: Optional[Literal["quantitative", "qualitative"]] = Field(
+        default=None, description="___"
+    )
+    result: Optional[str] = Field(default=None, description="___")

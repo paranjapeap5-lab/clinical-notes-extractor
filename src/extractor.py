@@ -1,6 +1,6 @@
 import json
 from pydantic import ValidationError
-from src.schemas import Demographics, Symptom
+from src.schemas import Demographics, Symptom, LabTest
 
 PROMPT_TEMPLATE = """Extract patient demographics from the clinical note below.
 
@@ -168,3 +168,15 @@ def extract_blood_tests(note: str, client) -> dict:
         }
 
     return {"status": "ok", "data": data}
+
+    # validate — data is a LIST, so validate each item
+    try:
+        lab_tests = [LabTest(**item) for item in data]
+        return {"status": "ok", "data": [lt.model_dump() for lt in lab_tests]}
+    except (ValidationError, TypeError) as e:
+        return {
+            "status": "error",
+            "stage": "validation",
+            "error": str(e),
+            "raw": raw_response,
+        }
