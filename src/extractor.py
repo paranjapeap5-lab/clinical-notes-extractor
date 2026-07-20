@@ -2,6 +2,17 @@ import json
 from pydantic import ValidationError
 from src.schemas import Demographics, Symptom, LabTest
 
+
+def strip_fences(text: str) -> str:
+    """Remove markdown fences from a string, if present."""
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
+        cleaned = cleaned.rsplit("```", 1)[0]
+        cleaned = cleaned.strip()
+    return cleaned
+
+
 PROMPT_TEMPLATE = """Extract patient demographics from the clinical note below.
 
 Return ONLY a JSON object with these exact fields:
@@ -27,11 +38,7 @@ def extract_demographics(note: str, client) -> dict:
     raw_response = client.complete(prompt)
 
     # clean markdown fences
-    cleaned = raw_response.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        cleaned = cleaned.rsplit("```", 1)[0]
-        cleaned = cleaned.strip()
+    cleaned = strip_fences(raw_response)
 
     # parse JSON
     try:
@@ -82,11 +89,7 @@ def extract_symptoms(note: str, client) -> dict:
     raw_response = client.complete(prompt)
 
     # clean markdown fences (robust)
-    cleaned = raw_response.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        cleaned = cleaned.rsplit("```", 1)[0]
-        cleaned = cleaned.strip()
+    cleaned = strip_fences(raw_response)
 
     # parse JSON
     try:
@@ -150,11 +153,7 @@ def extract_blood_tests(note: str, client) -> dict:
     raw_response = client.complete(prompt)
 
     # clean markdown fences
-    cleaned = raw_response.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned
-        cleaned = cleaned.rsplit("```", 1)[0]
-        cleaned = cleaned.strip()
+    cleaned = strip_fences(raw_response)
 
     # parse JSON
     try:

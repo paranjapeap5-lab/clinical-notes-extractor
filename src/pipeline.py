@@ -12,6 +12,20 @@ def load_notes(n: int) -> pd.DataFrame:
     return df.sample(n=n, random_state=config.RANDOM_STATE).reset_index(drop=True)
 
 
+def collect_rows(extractor, note_text, client, rows, note_id, label):
+    """Run a list-extractor and append its rows (or an error row) to `rows`."""
+    result = extractor(note_text, client)
+    if result["status"] == "ok":
+        for item in result["data"]:
+            rows.append({"note_id": note_id, **item})
+    else:
+        rows.append({"note_id": note_id, "error_stage": result["stage"]})
+        print(
+            f"  note {note_id}  ⚠️  {label} ERROR "
+            f"({result['stage']}): {result['error']}"
+        )
+
+
 def extract_all(notes: pd.DataFrame, client: ClaudeClient):
     demo_results = []
     symptom_rows = []
@@ -20,7 +34,7 @@ def extract_all(notes: pd.DataFrame, client: ClaudeClient):
     for i, row in notes.iterrows():
         note_text = row[config.NOTE_COLUMN]
 
-        # --- demographics (one object per note) ---
+        # --- demographics (one object per note) ---  [UNCHANGED]
         demo = extract_demographics(note_text, client)
         if demo["status"] == "ok":
             demo_results.append({"note_id": i, **demo["data"]})
@@ -31,28 +45,11 @@ def extract_all(notes: pd.DataFrame, client: ClaudeClient):
                 f"({demo['stage']}): {demo['error']}"
             )
 
-        # --- symptoms (a list per note) ---
-        symp = extract_symptoms(note_text, client)
-        if symp["status"] == "ok":
-            for s in symp["data"]:
-                symptom_rows.append({"note_id": i, **s})
-        else:
-            symptom_rows.append({"note_id": i, "error_stage": symp["stage"]})
-            print(
-                f"  note {i}  ⚠️  SYMPTOMS ERROR " f"({symp['stage']}): {symp['error']}"
-            )
-
-        # --- lab tests (a list per note) ---
-        lab_tests = extract_blood_tests(note_text, client)
-        if lab_tests["status"] == "ok":
-            for lt in lab_tests["data"]:
-                lab_test_rows.append({"note_id": i, **lt})
-        else:
-            lab_test_rows.append({"note_id": i, "error_stage": lab_tests["stage"]})
-            print(
-                f"  note {i}  ⚠️  LAB TESTS ERROR "
-                f"({lab_tests['stage']}): {lab_tests['error']}"
-            )
+        # --- symptoms & lab tests (lists) ---
+        collect_rows(extract_symptoms, note_text, client, symptom_rows, i, "SYMPTOMS")
+        collect_rows(
+            extract_blood_tests, note_text, client, lab_test_rows, i, "LAB TESTS"
+        )
 
         print(f"  extracted {i + 1}/{len(notes)}")
 
