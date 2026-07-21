@@ -10,6 +10,11 @@ st.set_page_config(
 )
 
 st.title("Clinical Notes Extractor")
+st.warning(
+    "**⚠️ Demo only — do NOT enter real patient data or PHI.** "
+    "This is a demonstration using synthetic clinical notes. "
+    "Text entered is sent to a third-party LLM API and is not stored."
+)
 st.write(
     "Extract structured demographics, symptoms, and lab tests from free-text "
     "clinical notes using an LLM with schema validation."
