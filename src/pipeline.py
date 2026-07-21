@@ -72,10 +72,6 @@ def main():
     symptoms.to_csv(f"{config.OUTPUT_DIR}/symptoms.csv", index=False)
     lab_tests.to_csv(f"{config.OUTPUT_DIR}/lab_tests.csv", index=False)
 
-    # combined: each symptom row joined to its note's demographics (denormalized view)
-    combined = symptoms.merge(demographics, on="note_id", how="left")
-    combined.to_csv(f"{config.OUTPUT_DIR}/combined.csv", index=False)
-
     print(f"\nDone. Wrote 4 files to {config.OUTPUT_DIR}/")
 
 

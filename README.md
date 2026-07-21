@@ -1,8 +1,14 @@
 # Clinical Notes Extractor
 
-Extracts structured patient information from unstructured clinical notes using an LLM (Claude), with schema validation and error handling so the output can be trusted rather than assumed correct.
+Extracts structured patient information from unstructured clinical notes using an LLM (Claude), with schema validation, structured error handling, and unit-tested extraction logic — so the output can be trusted rather than assumed correct.
 
-> ⚠️ **Work in progress.** Demographics extraction is implemented and working; the remaining categories (symptoms, comorbidities, medications, blood tests) and the evaluation are actively being built. See the [Roadmap](#roadmap).
+## 🔗 Live Demo
+
+**[Try it here →](https://clinical-notes-extractor-gac5gsqdaeyssdarf3n2jn.streamlit.app)** — paste a clinical note and see structured demographics, symptoms, and lab tests extracted live.
+
+![Demo screenshot](images/demo.png)
+
+> ⚠️ **Demo only — do not enter real patient data (PHI).** The demo uses synthetic clinical notes; text entered is sent to a third-party LLM API and is not stored.
 
 ## Goal
 
@@ -12,9 +18,9 @@ The target categories are:
 
 - **Demographics** — sex, age, weight, height, BMI *(implemented)*
 - **Symptoms** — including negated ("denies chest pain") and implicit findings *(implemented)*
+- **Lab tests** — test name, sample type, result type, and result, across specimen types (blood, urine, synovial fluid, CSF, etc.) *(implemented)*
 - **Comorbidities** — active, historical, and family history *(planned)*
 - **Medications** — name, dose, route, frequency *(planned)*
-- **Blood tests** — test name, value, unit, timeframe *(planned)*
 
 Every field not stated in the note is returned as null rather than fabricated.
 
@@ -22,25 +28,28 @@ Every field not stated in the note is returned as null rather than fabricated.
 
 An LLM can read the text, but its output is unreliable: it may return malformed JSON, hallucinate values, or produce the wrong type. This project treats the LLM as an untrusted component and wraps it in layers that catch those failures:
 
-- **Schema validation** (Pydantic) rejects output that doesn't match the expected types.
+- **Schema validation** (Pydantic) rejects output that doesn't match the expected types — including constrained fields (e.g. `result_type` must be exactly `quantitative` or `qualitative`).
 - **Structured error capture** records the failure stage (`json_parse` vs `validation`) and the raw model response, so failures are analyzable instead of lost.
 - **A swappable client seam** lets the same pipeline run against the real API or a stand-in for testing, with no other code changes.
+- **Unit tests** cover the extraction logic (100% line coverage), using a fake client to exercise success and failure paths without API calls.
 
-## What it extracts (currently)
+## What it extracts
 
-Demographics are the implemented category:
+**Demographics** (one record per note):
 
 | Field | Type | Notes |
 |---|---|---|
 | `sex` | string | "male" / "female", or null if not stated |
-| `age` | number | in years; may be fractional for infants (e.g. 0.03 for ~11 days old) |
-| `weight_kg` | number | kilograms; converted from imperial if needed |
-| `height_cm` | number | centimeters; converted if needed |
+| `age` | number | in years; may be fractional for infants (e.g. 0.5 for a 6-month-old) |
+| `weight_kg` | number | kilograms |
+| `height_cm` | number | centimeters |
 | `bmi` | number | body mass index |
 
-## Prerequisites
+**Symptoms** (a list per note): name, negated (e.g. "denies chest pain"), explicit vs. inferred, onset/duration, and severity.
 
-Before setting up, you need the following installed:
+**Lab tests** (a list per note): test name, sample type (inferred where possible — blood, urine, synovial fluid, CSF, etc.), result type (quantitative/qualitative), and the result value.
+
+## Prerequisites
 
 - **Python 3.12+** — developed with Python 3.12.13.
 - **Poetry** — for dependency management (developed with Poetry 2.4).
@@ -67,7 +76,7 @@ On Windows or Linux, see the [pyenv installation guide](https://github.com/pyenv
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/paranjapeap5-lab/clinical-notes-extractor.git
+   git clone https://github.com/pearlparanjape/clinical-notes-extractor.git
    cd clinical-notes-extractor
    ```
 
@@ -85,16 +94,24 @@ On Windows or Linux, see the [pyenv installation guide](https://github.com/pyenv
 
 ## Usage
 
-Run the pipeline:
+### Run the pipeline (batch extraction)
 ```bash
 PYTHONPATH=. poetry run python -m src.pipeline
 ```
-
-This loads a sample of clinical notes, extracts demographics from each, and writes three files to `data/`:
+This loads a sample of clinical notes, extracts all categories from each, and writes four CSVs to `data/`:
 
 - `original.csv` — the input notes
-- `demographics.csv` — the extracted fields only
-- `combined.csv` — both, side by side
+- `demographics.csv` — one row per note (wide)
+- `symptoms.csv` — one row per symptom, keyed by `note_id` (long)
+- `lab_tests.csv` — one row per lab test, keyed by `note_id` (long)
+
+Demographics is one-to-one with each note, so it's stored wide; symptoms and lab tests are one-to-many, so they're stored long and linked back by `note_id`.
+
+### Run the demo app (single note)
+```bash
+poetry run streamlit run app.py
+```
+Opens a local web app where you can paste a note and see the extraction live.
 
 ### Configuration
 
@@ -112,14 +129,16 @@ Change any setting there without touching the pipeline logic.
 
 ## Development
 
-This project uses Black (formatting) and flake8 (linting), enforced automatically via a pre-commit hook.
+This project uses Black (formatting), flake8 (linting), and pytest (tests), enforced automatically via a pre-commit hook.
 
 ```bash
 make format   # auto-fix formatting with Black
-make lint     # check formatting + linting (does not modify files)
+make lint     # check formatting + linting
+poetry run pytest              # run the tests
+poetry run pytest --cov=src    # run with coverage
 ```
 
-The pre-commit hook runs these checks on every commit and blocks the commit if they fail. To set it up after cloning:
+The pre-commit hook runs formatting, linting, and tests on every commit and blocks the commit if any fail. To set it up after cloning:
 ```bash
 poetry run pre-commit install
 ```
@@ -128,23 +147,27 @@ poetry run pre-commit install
 
 The extractor never crashes on a bad note. Each note produces one of:
 
-- **Success** -> `{"status": "ok", "data": {...}}`
-- **Failure** -> `{"status": "error", "stage": ..., "error": ..., "raw": ...}`
+- **Success** → `{"status": "ok", "data": {...}}`
+- **Failure** → `{"status": "error", "stage": ..., "error": ..., "raw": ...}`
 
-The `stage` distinguishes a JSON parsing failure from a schema validation failure — different problems with different causes. The raw model response is kept for debugging. In a batch run, failures are recorded (in the terminal and the output) while the run continues, so one problematic note never loses the rest.
+The `stage` distinguishes a JSON parsing failure from a schema validation failure — different problems with different causes. The raw model response is kept for debugging. In a batch run, failures are recorded while the run continues, so one problematic note never loses the rest.
 
 ## Project structure
 
 ```
 clinical-notes-extractor/
+├── app.py                 # Streamlit demo app (single note)
 ├── src/
 │   ├── config.py          # all settings in one place
 │   ├── schemas.py         # Pydantic models — the source of truth for output shape
 │   ├── claude_client.py   # real Claude API client
 │   ├── fake_client.py     # stand-in client for testing (no API calls)
 │   ├── extractor.py       # prompt -> call -> parse -> validate; returns structured result
-│   └── pipeline.py        # load -> extract -> save three CSVs
+│   └── pipeline.py        # load -> extract -> save CSVs
+├── tests/                 # unit tests (100% coverage of extraction logic)
 ├── data/                  # outputs (gitignored)
+├── images/                # README assets
+├── requirements.txt       # for deployment
 ├── Makefile
 ├── pyproject.toml
 ├── .env                   # API key (gitignored, never committed)
@@ -159,21 +182,24 @@ Designed for the [`AGBonnet/augmented-clinical-notes`](https://huggingface.co/da
 
 ## Roadmap
 
-🚧 *In progress — items are checked off as they land.*
+**Done**
+- [x] Demographics extraction
+- [x] Symptoms extraction (with negation and implicit-finding handling)
+- [x] Lab tests extraction (all specimen types, with inferred sample type)
+- [x] Schema validation with constrained fields (Pydantic)
+- [x] Structured error handling (json_parse vs. validation)
+- [x] Unit tests (100% coverage of extraction logic)
+- [x] Streamlit demo app (deployed)
 
-
-### Extraction categories
-- [X] Symptoms (with negation handling)
-- [X] Lab tests (all specimen types, with sample_type)
-- [ ] Comorbidities
-- [ ] Medications
-- [ ] Evaluation against hand-labeled ground truth (precision / recall per field)
-- [ ] Robust batch processing (checkpointing, resume) for the full dataset
-- [ ] Create Streamlit demo
+**In progress / planned**
+- [ ] Evaluation against hand-labeled ground truth (precision / recall / F1 per field)
+- [ ] Batch processing with checkpointing / resume
+- [ ] Comorbidities extraction
+- [ ] Medications extraction
 
 ## Limitations
 
-This is a research and portfolio project — **not a medical device**. Extraction is imperfect; do not use it for clinical decisions. The LLM can make mistakes the validation layer does not catch (e.g. a plausible-but-wrong value). Accuracy has not yet been formally measured (see roadmap).
+This is a research and portfolio project — **not a medical device**. Extraction is imperfect; do not use it for clinical decisions. The LLM can make mistakes the validation layer does not catch (e.g. a plausible-but-wrong value). Accuracy has not yet been formally measured — a hand-labeled evaluation is in progress (see roadmap).
 
 ## License
 
